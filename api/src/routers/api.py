@@ -249,9 +249,7 @@ async def retrieve_model(model: str):
         "kokoro": {"id": "kokoro", "object": "model", "created": 1686935002, "owned_by": "kokoro"},
     }
     if model not in models:
-        raise HTTPException(status_code=404, detail={
-            "error": "model_not_found", "message": f"Model '{model}' not found", "type": "invalid_request_error",
-        })
+        raise HTTPException(status_code=404)
     return models[model]
 
 

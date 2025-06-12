@@ -1,5 +1,3 @@
-"""Clean Kokoro implementation with controlled resource management."""
-
 import os
 from typing import AsyncGenerator, Dict, Optional, Tuple, Union
 
@@ -16,68 +14,43 @@ from .base import AudioChunk, BaseModelBackend
 
 
 class KokoroV1(BaseModelBackend):
-    """Kokoro backend with controlled resource management."""
-
     def __init__(self):
         """Initialize backend with environment-based configuration."""
         super().__init__()
-        # Strictly respect settings.use_gpu
         self._device = settings.get_device()
         self._model: Optional[KModel] = None
-        self._pipelines: Dict[str, KPipeline] = {}  # Store pipelines by lang_code
+        self._pipelines: Dict[str, KPipeline] = {}
 
     async def load_model(self, path: str) -> None:
-        """Load pre-baked model.
+        model_path = await paths.get_model_path(path)
+        config_path = os.path.join(os.path.dirname(model_path), "config.json")
 
-        Args:
-            path: Path to model file
+        if not os.path.exists(config_path):
+            raise RuntimeError(f"Config file not found: {config_path}")
 
-        Raises:
-            RuntimeError: If model loading fails
-        """
-        try:
-            # Get verified model path
-            model_path = await paths.get_model_path(path)
-            config_path = os.path.join(os.path.dirname(model_path), "config.json")
+        logger.info(f"Loading Kokoro model on {self._device}")
+        logger.info(f"Config path: {config_path}")
+        logger.info(f"Model path: {model_path}")
 
-            if not os.path.exists(config_path):
-                raise RuntimeError(f"Config file not found: {config_path}")
+        # Load model and let KModel handle device mapping
+        self._model = KModel(repo_id='hexgrad/Kokoro-82M', config=config_path, model=model_path).eval()
+        # For MPS, manually move ISTFT layers to CPU while keeping rest on MPS
+        if self._device == "mps":
+            logger.info("Moving model to MPS device with CPU fallback for unsupported operations")
+            self._model = self._model.to(torch.device("mps"))
+        elif self._device == "cuda":
+            self._model = self._model.cuda()
+        else:
+            self._model = self._model.cpu()
 
-            logger.info(f"Loading Kokoro model on {self._device}")
-            logger.info(f"Config path: {config_path}")
-            logger.info(f"Model path: {model_path}")
-
-            # Load model and let KModel handle device mapping
-            self._model = KModel(repo_id='hexgrad/Kokoro-82M', config=config_path, model=model_path).eval()
-            # For MPS, manually move ISTFT layers to CPU while keeping rest on MPS
-            if self._device == "mps":
-                logger.info("Moving model to MPS device with CPU fallback for unsupported operations")
-                self._model = self._model.to(torch.device("mps"))
-            elif self._device == "cuda":
-                self._model = self._model.cuda()
-            else:
-                self._model = self._model.cpu()
-
-        except FileNotFoundError as e:
-            raise e
-        except Exception as e:
-            raise RuntimeError(f"Failed to load Kokoro model: {e}")
 
     def _get_pipeline(self, lang_code: str) -> KPipeline:
-        """Get or create pipeline for language code.
-
-        Args:
-            lang_code: Language code to use
-
-        Returns:
-            KPipeline instance for the language
-        """
         if not self._model:
             raise RuntimeError("Model not loaded")
 
         if lang_code not in self._pipelines:
             logger.info(f"Creating new pipeline for language code: {lang_code}")
-            self._pipelines[lang_code] = KPipeline(lang_code=lang_code, model=self._model, device=self._device)
+            self._pipelines[lang_code] = KPipeline(repo_id='hexgrad/Kokoro-82M', lang_code=lang_code, model=self._model, device=self._device)
         return self._pipelines[lang_code]
 
     async def generate_from_tokens(
@@ -87,20 +60,6 @@ class KokoroV1(BaseModelBackend):
         speed: float = 1.0,
         lang_code: Optional[str] = None,
     ) -> AsyncGenerator[np.ndarray, None]:
-        """Generate audio from phoneme tokens.
-
-        Args:
-            tokens: Input phoneme tokens to synthesize
-            voice: Either a voice path string or a tuple of (voice_name, voice_tensor/path)
-            speed: Speed multiplier
-            lang_code: Optional language code override
-
-        Yields:
-            Generated audio chunks
-
-        Raises:
-            RuntimeError: If generation fails
-        """
         if not self.is_loaded:
             raise RuntimeError("Model not loaded")
 
@@ -173,20 +132,7 @@ class KokoroV1(BaseModelBackend):
         lang_code: Optional[str] = None,
         return_timestamps: Optional[bool] = False,
     ) -> AsyncGenerator[AudioChunk, None]:
-        """Generate audio using model.
-
-        Args:
-            text: Input text to synthesize
-            voice: Either a voice path string or a tuple of (voice_name, voice_tensor/path)
-            speed: Speed multiplier
-            lang_code: Optional language code override
-
-        Yields:
-            Generated audio chunks
-
-        Raises:
-            RuntimeError: If generation fails
-        """
+        """Generate audio using model."""
         if not self.is_loaded:
             raise RuntimeError("Model not loaded")
         try:

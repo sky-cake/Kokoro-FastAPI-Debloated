@@ -1,5 +1,3 @@
-"""Web player router with async file serving."""
-
 from fastapi import APIRouter
 from fastapi.responses import Response
 

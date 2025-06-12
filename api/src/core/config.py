@@ -2,13 +2,14 @@ import torch
 from pydantic_settings import BaseSettings
 
 import os
-from pathlib import Path
 
 
-PROJECT_ROOT = Path.cwd()
+root_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
+api_path = os.path.join(root_path, 'api')
+web_path = os.path.join(root_path, 'web')
 
-os.environ["PYTHONPATH"] = f"{PROJECT_ROOT}:{PROJECT_ROOT / 'api'}"
-os.environ["WEB_PLAYER_PATH"] = str(PROJECT_ROOT / "web")
+os.environ["PYTHONPATH"] = f"{root_path}:{api_path}"
+os.environ["WEB_PLAYER_PATH"] = web_path
 
 
 class Settings(BaseSettings):
@@ -53,14 +54,7 @@ class Settings(BaseSettings):
     max_temp_dir_count: int = 3
 
     def get_device(self) -> str:
-        if not self.use_gpu:
-            return "cpu"
-        if self.device_type:
-            return self.device_type
-        if torch.backends.mps.is_available():
-            return "mps"
-        elif torch.cuda.is_available():
-            return "cuda"
-        return "cpu"
+        assert torch.cuda.is_available()
+        return "cuda"
 
 settings = Settings()

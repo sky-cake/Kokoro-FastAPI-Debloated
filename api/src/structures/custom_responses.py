@@ -9,8 +9,6 @@ from starlette.responses import JSONResponse, StreamingResponse
 
 
 class JSONStreamingResponse(StreamingResponse, JSONResponse):
-    """StreamingResponse that also render with JSON."""
-
     def __init__(
         self,
         content: Iterable | AsyncIterable,
@@ -20,15 +18,15 @@ class JSONStreamingResponse(StreamingResponse, JSONResponse):
         background: BackgroundTask | None = None,
     ) -> None:
         if isinstance(content, AsyncIterable):
-            self._content_iterable: AsyncIterable = content
+            self._content_iterable = content
         else:
             self._content_iterable = iterate_in_threadpool(content)
 
         async def body_iterator() -> AsyncIterable[bytes]:
-            async for content_ in self._content_iterable:
-                if isinstance(content_, BaseModel):
-                    content_ = content_.model_dump()
-                yield self.render(content_)
+            async for item in self._content_iterable:
+                if isinstance(item, BaseModel):
+                    item = item.model_dump()
+                yield self.render(item)
 
         self.body_iterator = body_iterator()
         self.status_code = status_code
@@ -43,7 +41,6 @@ class JSONStreamingResponse(StreamingResponse, JSONResponse):
                 content,
                 ensure_ascii=False,
                 allow_nan=False,
-                indent=None,
                 separators=(",", ":"),
             )
             + "\n"
