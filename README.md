@@ -2,7 +2,9 @@
 
 A debloated version of https://github.com/remsky/Kokoro-FastAPI.
 
-Only contains the necessary Python packages and endpoints for doing TTS.
+Only contains the necessary Python packages and endpoints for doing TTS via a web UI and API.
+
+Just like Kokoro-FastAPI, the web UI does not support FireFox because it can't. FF does not support the right audio encodings. Use Chromium instead.
 
 ## Running
 

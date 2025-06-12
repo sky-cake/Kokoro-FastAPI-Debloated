@@ -48,7 +48,7 @@ class KokoroV1(BaseModelBackend):
             logger.info(f"Model path: {model_path}")
 
             # Load model and let KModel handle device mapping
-            self._model = KModel(config=config_path, model=model_path).eval()
+            self._model = KModel(repo_id='hexgrad/Kokoro-82M', config=config_path, model=model_path).eval()
             # For MPS, manually move ISTFT layers to CPU while keeping rest on MPS
             if self._device == "mps":
                 logger.info("Moving model to MPS device with CPU fallback for unsupported operations")
